@@ -1,19 +1,17 @@
-/* 
-Subtask2 - Task 1 - C0P290. Semester 2, 2020-21
-Authors - Harshita(2019CS10357) & Om Krishna(2019CS10272)
-*/
-
+#include <opencv4/opencv2/opencv.hpp>
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-#include "opencv2/imgproc/imgproc_c.h"
+#include <opencv2/video/background_segm.hpp>
+#include "opencv2/bgsegm.hpp"
+
+
 #include <iostream>
-#include <string>
 #include <sstream>
 
 using namespace cv;
 using namespace std;
+
 int c = 0;
 
 string int2str(int &i) 
@@ -24,7 +22,7 @@ string int2str(int &i)
     return ss.str();
 }
 
-int main(int argc, char **argv) 
+int main(int argc, char** argv)
 {
 	string s;
 
@@ -35,67 +33,71 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	Mat img = imread(argv[2]);
+	Mat img = imread("background.png");
     if(!img.data)
 	{
         cout << "Err : Couldnt read the image file. Check the path/extension" << endl;
         return -1;
     }
 
-	cvtColor(img,img,COLOR_BGR2GRAY);
-	vector<Point2f> img_points;
+    cvtColor(img,img,COLOR_BGR2GRAY);
+
+    vector<Point2f> img_points;
     vector<Point2f> crp_points;
 
-	img_points.push_back(Point2f(300,100));
-	img_points.push_back(Point2f(446,100));
-	img_points.push_back(Point2f(520,360));
-	img_points.push_back(Point2f(120,360));
+    Mat img_cropped;
+
+    img_points.push_back(Point2f(937,275));
+    img_points.push_back(Point2f(1290,267));
+    img_points.push_back(Point2f(1535,1047));
+    img_points.push_back(Point2f(579,1053));
 
     //Points start at top-left and go clockwise
     crp_points.push_back(Point2f(0,0));
-    crp_points.push_back(Point2f(300,0));
-    crp_points.push_back(Point2f(300,600));
-    crp_points.push_back(Point2f(0,600));
+    crp_points.push_back(Point2f(400,0));
+    crp_points.push_back(Point2f(400,800));
+    crp_points.push_back(Point2f(0,800));
 
-    Size size(300,600);
+    //Finding the homography matrix and using it for perspective correction
+    Size size(400,800);
     Mat h2 = findHomography(img_points,crp_points);
-    warpPerspective(img,img,h2,size);
+    warpPerspective(img,img_cropped,h2,size);
 
-	/* double fps = cap.get(cv::CAP_PROP_FPS); //get the frames per seconds of the video
-	cout << "Frame per seconds : " << fps << endl; */
+    //Displaying output images to the user
+    imwrite("Empty.jpg",img_cropped);
 
-	while (1)
+    while (1)
 	{
 		Mat frame;
-		Mat Gray_frame;
+        Mat cropped_frame;
 		bool bSuccess = cap.read(frame); // read a new frame from video
 
 		if (!bSuccess) { cout << "Fin" << endl; break; }
 
 		cvtColor(frame,frame,COLOR_BGR2GRAY);
 
-		img_points.push_back(Point2f(300,100));
-		img_points.push_back(Point2f(446,100));
-		img_points.push_back(Point2f(520,360));
-		img_points.push_back(Point2f(120,360));
+		vector<Point2f> frame_p;
+        vector<Point2f> crframe_p;
 
-		//Points start at top-left and go clockwise
-		crp_points.push_back(Point2f(0,0));
-		crp_points.push_back(Point2f(300,0));
-		crp_points.push_back(Point2f(300,600));
-		crp_points.push_back(Point2f(0,600));
+        frame_p.push_back(Point2f(314,95));
+        frame_p.push_back(Point2f(435,95));
+        frame_p.push_back(Point2f(529,363));
+        frame_p.push_back(Point2f(187,357));
 
-		Size size(300,600);
-		Mat h2 = findHomography(img_points,crp_points);
-		warpPerspective(frame,frame,h2,size);
+        crframe_p.push_back(Point2f(0,0));
+        crframe_p.push_back(Point2f(400,0));
+        crframe_p.push_back(Point2f(400,800));
+        crframe_p.push_back(Point2f(0,800));
 
-		frame = frame - img;
+        Mat h = findHomography(frame_p,crframe_p);
+        warpPerspective(frame,cropped_frame,h,size);
+
+		cropped_frame = cropped_frame - img_cropped;
 
 		s = int2str(c);
 		c++;
-		imwrite("ig" + s + ".jpg", frame);
+		imwrite("ig" + s + ".jpg", cropped_frame);
 	}
-	imwrite("igempty.jpg", img);
-	return 0;
-}
 
+    return 0;
+}
