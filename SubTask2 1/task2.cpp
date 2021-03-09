@@ -72,11 +72,15 @@ int main(int argc, char** argv)
     pBackSub->apply(img_cropped, fgMask,0);
     ofstream MyFile("output.csv");
 
+    Mat prev_mask;
+    Mat flow;
+
     while (1)
 	{
 		Mat frame;
         Mat cropped_frame;
-		bool bSuccess = cap.read(frame); // read a new frame from video
+        
+		bool bSuccess = cap.read(frame); 
 
 		if (!bSuccess) { cout << "Fin" << endl; break; }
 
@@ -100,23 +104,54 @@ int main(int argc, char** argv)
 
         pBackSub->apply(cropped_frame, fgMask,0);
 
-		s = int2str(c);
-		c++;
-		
-
         float pixels = fgMask.rows * fgMask.cols;
         float nonZeroPixels = countNonZero(fgMask);
-        float density = nonZeroPixels/pixels;
+        float q_density = nonZeroPixels/pixels;
+
+        float dy_pixels,dy_density;
+
+        if(prev_mask.empty()==false){
+            calcOpticalFlowFarneback(prev_mask,cropped_frame, flow, 0.5, 3, 15, 3, 5, 1.2, 0);
+        
+            Mat flow_parts[2];
+            split(flow, flow_parts);
+            Mat magnitude, angle, magn_norm;
+            cartToPolar(flow_parts[0], flow_parts[1], magnitude, angle, true);
+            normalize(magnitude, magn_norm, 0.0f, 1.0f, NORM_MINMAX);
+            angle *= ((1.f / 360.f) * (180.f / 255.f));
+            //build hsv image
+            Mat _hsv[3], hsv, hsv8, bgr;
+            _hsv[0] = angle;
+            _hsv[1] = Mat::ones(angle.size(), CV_32F);
+            _hsv[2] = magn_norm;
+            merge(_hsv, 3, hsv);
+            hsv.convertTo(hsv8, CV_8U, 255.0);
+            cvtColor(hsv8, bgr, COLOR_HSV2BGR);
+
+            cvtColor(bgr,bgr,COLOR_BGR2GRAY);
+            
+            dy_pixels = countNonZero(bgr);
+            dy_density = dy_pixels/pixels;
+        }
+
+        
+
+
+        s = int2str(c);
+		c++;
+        cropped_frame.copyTo(prev_mask);
 
         if(c%15==0) {
-            MyFile <<(c/15)<<","<< density<<endl;
-            cout<<(c/15)<<","<< density<<endl;
+            MyFile <<(c/15)<<","<< q_density<<","<<dy_density<<endl;
+            
+            cout<<(c/15)<<","<< q_density<<","<<dy_density<<endl;
+            
             //imwrite("ig" + s + ".jpg", fgMask);
         }
 
         
 	}
-
+    
     return 0;
     MyFile.close();
 }
