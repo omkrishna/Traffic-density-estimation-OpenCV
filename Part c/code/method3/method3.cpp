@@ -21,13 +21,13 @@ using namespace std;
 using namespace std::chrono;
 
 //ofstream MyFile("out.csv");
-ofstream MyTextFile("baseline.txt");
+ofstream MyTextFile("out.txt");
 float q_density_avg = 0;
 vector<Mat> fgMask;
 Mat mask;
 
 void *myBackgroundSubtractor(void *threadarg);
-vector<Mat> subdivide(Mat img, const int rowDivisor, const int colDivisor);
+vector<Mat> subdivide(Mat img, int rowDivisor, int colDivisor);
 
 Ptr<BackgroundSubtractor> backSubt = createBackgroundSubtractorMOG2();
 
@@ -97,7 +97,7 @@ int main(int argc, char **argv)
         }
         else
         {
-            pthread_t t1, t2, t3, t0;
+
             vector<Point2f> frame_p;
             vector<Point2f> crframe_p;
             Size size(400, 800);
@@ -122,11 +122,17 @@ int main(int argc, char **argv)
             warpPerspective(frame, cropped_frame, h, size);
 
             vector<Mat> img_blocks = subdivide(cropped_frame, 2, 2);
+            pthread_t threads[4];
+            struct thread_data td[4];
 
-            struct thread_data fr0;
-            fr0.frame = img_blocks.at(0);
-            fr0.n = 0;
-            pthread_create(&t0, NULL, myBackgroundSubtractor, (void *)&fr0);
+            for (int i = 0; i < 4; i++)
+            {
+                td[i].frame = img_blocks.at(i);
+                td[i].n = i;
+                pthread_create(&threads[i], NULL, myBackgroundSubtractor, (void *)&td[i]);
+
+                pthread_join(threads[i], NULL);
+            }
 
             c++;
             //writing the averaged queue & dynamic density per second (15 frames)
@@ -134,14 +140,12 @@ int main(int argc, char **argv)
             {
                 //MyFile << (c / 15) << "," << q_density_avg / 15 << "," << dy_density_avg / 15 << endl;
 
-                MyTextFile << (c / 15) << "," << q_density_avg / 15 << endl;
+                MyTextFile << (c / 15) << "," << q_density_avg / 60 << endl;
 
-                cout << (c / 15) << "," << q_density_avg / 15 << endl;
+                cout << (c / 15) << "," << q_density_avg / 60 << endl;
 
                 q_density_avg = 0;
             }
-
-            pthread_join(t0, NULL);
         }
     }
 
@@ -160,6 +164,11 @@ void *myBackgroundSubtractor(void *threadarg)
     struct thread_data *my_data;
     my_data = (struct thread_data *)threadarg;
 
+    //imshow("f", my_data->frame);
+    //waitKey(0);
+    //imshow("f", fgMask.at(my_data->n));
+    //waitKey(0);
+
     backSubt->apply(my_data->frame, fgMask.at(my_data->n), 0);
     //threshold(fgMask, fgMask, 128, 255, cv::THRESH_BINARY);
 
@@ -174,7 +183,7 @@ void *myBackgroundSubtractor(void *threadarg)
     return NULL;
 }
 
-vector<Mat> subdivide(Mat img, const int rowDivisor, const int colDivisor)
+vector<Mat> subdivide(Mat img, int rowDivisor, int colDivisor)
 {
     vector<Mat> img_blocks;
     if (!img.data || img.empty())

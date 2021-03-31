@@ -21,7 +21,7 @@ using namespace std;
 using namespace std::chrono;
 
 //ofstream MyFile("out.csv");
-ofstream MyTextFile("2.txt");
+
 float q_density_avg = 0;
 Mat fgMask;
 
@@ -35,6 +35,10 @@ struct thread_data
 
 int main(int argc, char **argv)
 {
+    const int NUM_THREADS = stoi(argv[2]);
+    string t = argv[2];
+    ofstream MyTextFile(t.append(".txt"));
+
     auto start = high_resolution_clock::now();
     int c = 0;
     VideoCapture cap(argv[1]);
@@ -80,69 +84,46 @@ int main(int argc, char **argv)
 
     backSubt->apply(img_cropped, fgMask, 0);
 
-    pthread_t t1;
-    pthread_t t2;
-    
-    
-
-    Mat frame2;
-  
+    bool bSuc[NUM_THREADS];
+    Mat frames[NUM_THREADS];
+    pthread_t threads[NUM_THREADS];
 
     while (1)
     {
-        bool bSuccess = cap.read(frame);
-        bool bSuccess2 = cap.read(frame2);
-       
-        if (!bSuccess2)
+
+        for (int i = 0; i < NUM_THREADS; i++)
+            bSuc[i] = cap.read(frames[i]);
+
+        if (!bSuc[NUM_THREADS - 1])
         {
             cout << "Fin" << endl;
             break;
         }
         else
         {
-            struct thread_data fr;
-            fr.frame = frame;
-            c++;
-            pthread_create(&t1, NULL, myBackgroundSubtractor, (void *)&fr);
+            struct thread_data td[NUM_THREADS];
 
-            //writing the averaged queue & dynamic density per second (15 frames)
-            if (c % 15 == 0)
+            for (int i = 0; i < NUM_THREADS; i++)
             {
-                //MyFile << (c / 15) << "," << q_density_avg / 15 << "," << dy_density_avg / 15 << endl;
+                td[i].frame = frames[i];
+                c++;
+                pthread_create(&threads[i], NULL, myBackgroundSubtractor, (void *)&td[i]);
 
-                MyTextFile << (c / 15) << "," << q_density_avg / 15 << endl;
+                if (c % 15 == 0)
+                {
 
-                cout << (c / 15) << "," << q_density_avg / 15 << endl;
+                    MyTextFile << (c / 15) << "," << q_density_avg / 15 << endl;
 
-                q_density_avg = 0;
+                    cout << (c / 15) << "," << q_density_avg / 15 << endl;
+
+                    q_density_avg = 0;
+                }
             }
 
-            struct thread_data fr2;
-            fr2.frame = frame2;
-            c++;
-            pthread_create(&t2, NULL, myBackgroundSubtractor, (void *)&fr2);
-
-            //writing the averaged queue & dynamic density per second (15 frames)
-            if (c % 15 == 0)
+            for (int i = 0; i < NUM_THREADS; i++)
             {
-                //MyFile << (c / 15) << "," << q_density_avg / 15 << "," << dy_density_avg / 15 << endl;
-
-                MyTextFile << (c / 15) << "," << q_density_avg / 15 << endl;
-
-                cout << (c / 15) << "," << q_density_avg / 15 << endl;
-
-                q_density_avg = 0;
+                pthread_join(threads[i], NULL);
             }
-
-              
-
-            
-            
-
-            pthread_join(t1, NULL);
-            pthread_join(t2, NULL);
-            
-            
         }
     }
 
